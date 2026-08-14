@@ -36,35 +36,78 @@ class ToolDefinition:
     input_schema: dict[str, Any]  # JSON Schema for the tool's arguments
 
 
+# --- Content blocks -----------------------------------------------------
+#
+# A Message's content is either a plain string (the common case: a user
+# prompt, a system instruction, plain assistant prose) or a list of these
+# blocks, when the turn needs to carry structure — an assistant proposing
+# one or more tool calls, or a reply carrying one or more tool results.
+# This mirrors Anthropic's native content-block shape directly; an
+# OpenAI-style adapter would map ToolUseBlock -> its `tool_calls` array and
+# ToolResultBlock -> a role="tool" message with matching tool_call_id.
+
+
 @dataclass
-class ToolCall:
+class TextBlock:
+    text: str
+    type: Literal["text"] = "text"
+
+
+@dataclass
+class ToolUseBlock:
     """A model-requested invocation of a tool. The orchestrator executes
-    it (never the agent directly) and feeds the result back as a Message
-    with role=TOOL and matching tool_call_id."""
+    it (never the agent directly) and feeds the outcome back as a
+    ToolResultBlock with matching `id`."""
 
     id: str
     name: str
     input: dict[str, Any]
+    type: Literal["tool_use"] = "tool_use"
+
+
+@dataclass
+class ToolResultBlock:
+    tool_use_id: str
+    content: str
+    is_error: bool = False
+    type: Literal["tool_result"] = "tool_result"
+
+
+ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
 
 
 @dataclass
 class Message:
-    """One turn in the conversation. Shape is intentionally generic so it
-    maps cleanly onto both content-block APIs (Anthropic) and
-    tool_calls-array APIs (OpenAI-style):
+    """One turn in the conversation.
 
-    - USER / SYSTEM: `content` set, everything else None.
-    - ASSISTANT: `content` (may be empty string) and/or `tool_calls` set,
-      when the model responded with one or more tool invocations.
-    - TOOL: `content` is the stringified result, `tool_call_id` links it
-      back to the ToolCall it answers, `is_error` flags a failed call.
+    - USER / SYSTEM: usually a plain string; a list is only needed if the
+      turn is carrying tool results back (role=TOOL messages use a list of
+      ToolResultBlock).
+    - ASSISTANT: a string for plain prose, or a list mixing TextBlock and
+      ToolUseBlock when the model responded with (or alongside) tool
+      invocations.
+    - TOOL: a list of one or more ToolResultBlock, each keyed by
+      tool_use_id back to the ToolUseBlock it answers.
     """
 
     role: Role
-    content: str | None = None
-    tool_calls: list[ToolCall] | None = None
-    tool_call_id: str | None = None
-    is_error: bool = False
+    content: str | list[ContentBlock]
+
+
+def tool_uses(message: Message) -> list[ToolUseBlock]:
+    """Extract any ToolUseBlock entries from a message's content. Returns
+    an empty list for plain-string content or content with no tool uses."""
+    if isinstance(message.content, str):
+        return []
+    return [block for block in message.content if isinstance(block, ToolUseBlock)]
+
+
+def text(message: Message) -> str:
+    """Concatenate a message's text content, ignoring tool blocks. Returns
+    the string directly for plain-string content."""
+    if isinstance(message.content, str):
+        return message.content
+    return "".join(block.text for block in message.content if isinstance(block, TextBlock))
 
 
 @dataclass

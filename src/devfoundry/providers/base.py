@@ -19,9 +19,10 @@ Three methods, deliberately kept separate rather than folded into one
 - `tool_call`  — like `generate`, but the caller requires a tool
                  invocation, not prose: it forces tool use (all offered
                  tools, or one specific tool via `tool_choice`) and raises
-                 `NoToolCallError` if the model still answers with plain
-                 text. This is what the orchestrator uses for structured
-                 decisions (e.g. routing) where free text isn't acceptable.
+                 `NoToolCallError` if the resulting message carries no
+                 ToolUseBlock. This is what the orchestrator uses for
+                 structured decisions (e.g. routing) where free text isn't
+                 acceptable.
 """
 
 from __future__ import annotations
@@ -101,7 +102,8 @@ class ModelProvider(ABC):
     ) -> GenerateResult:
         """Forced tool-use completion. `tool_choice` names one tool to
         force; omitted, the model must call one of `tools` but picks which.
-        Raises NoToolCallError if the result contains no tool_calls.
-        Defaults to temperature=0.0 (distinct from generate/stream) since
-        callers use this for structured decisions, not creative output."""
+        Raises NoToolCallError if the result message carries no
+        ToolUseBlock. Defaults to temperature=0.0 (distinct from
+        generate/stream) since callers use this for structured decisions,
+        not creative output."""
         ...
