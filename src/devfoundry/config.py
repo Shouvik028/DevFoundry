@@ -26,3 +26,12 @@ def get_anthropic_api_key() -> str:
             "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and fill it in."
         )
     return key
+
+
+def get_github_token() -> str:
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise ConfigError(
+            "GITHUB_TOKEN is not set. Copy .env.example to .env and fill it in."
+        )
+    return token

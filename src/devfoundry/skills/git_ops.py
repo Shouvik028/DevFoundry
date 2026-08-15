@@ -1,8 +1,9 @@
 """git skills: read-only git operations agents can use as context sources.
 
-Read-only skills need no permission gating (spec 5: read-only skills run
-free; mutating/destructive ops require confirmation — that tier system
-lands in Stage 2). `git.diff` is the only skill Stage 1 needs.
+`git.diff` is READ_ONLY (spec 5: read-only skills run free; mutating skills
+like github.pr_comment require confirmation) — declared explicitly via
+@tier so it still routes through PermissionGate for a single audit trail
+(spec 3.1), even though that tier never triggers a confirmation prompt.
 """
 
 from __future__ import annotations
@@ -10,12 +11,15 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from devfoundry.skills.permissions import SkillTier, tier
+
 
 class SkillError(Exception):
     """Raised when a skill can't complete — bad repo path, git not on
     PATH, invalid ref, etc."""
 
 
+@tier(SkillTier.READ_ONLY)
 def git_diff(repo_path: str | Path, ref: str | None = None) -> str:
     """Return a unified diff as text.
 
